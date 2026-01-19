@@ -115,14 +115,11 @@ export default {
     const dateStr = `${yyyy}-${mm}-${dd}`;
 
     // Get daily checklist (default + special)
-    let checklist: string[] = JSON.parse((await env.CHECKLIST_KV.get(`checklist:${dateStr}`)) ?? "[]");
-
-    if (checklist.length === 0) {
-      // fallback daily checklist by weekday
-      const weekdays = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
-      const dayKey = `checklist:${weekdays[now.getUTCDay()]}`;
-      checklist = JSON.parse((await env.CHECKLIST_KV.get(dayKey)) ?? "[]");
-    }
+    const special: string[] = JSON.parse((await env.CHECKLIST_KV.get(`checklist:${dateStr}`)) ?? "[]");
+    const weekdays = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+    const dayKey = `checklist:${weekdays[now.getUTCDay()]}`;
+    const defaultList: string[] = JSON.parse((await env.CHECKLIST_KV.get(dayKey)) ?? "[]");
+    let checklist: string[] = Array.from(new Set([...defaultList, ...special]));
 
     if (checklist.length === 0) checklist = ["📝 No checklist configured for today"];
 
