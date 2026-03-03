@@ -1,6 +1,6 @@
 export default {
   async fetch(request: Request, env: any) {
-    const body:any = await request.json();
+    const body: any = await request.json();
 
     // Handle button clicks (callback_query)
     if (body.callback_query) {
@@ -23,10 +23,8 @@ export default {
       await env.CHECKLIST_KV.put(doneKey, JSON.stringify(doneItems));
 
       // Edit original message to show ✅
-      const checklistText = JSON.parse(await env.CHECKLIST_KV.get(`checklist:${date}`) ?? "[]");
-      const newText = checklistText
-        .map((item: string, i: number) => (doneItems.includes(String(i)) ? `✅ ${item}` : `☐ ${item}`))
-        .join("\n");
+      const checklistText = JSON.parse((await env.CHECKLIST_KV.get(`checklist:${date}`)) ?? "[]");
+      const newText = checklistText.map((item: string, i: number) => (doneItems.includes(String(i)) ? `✅ ${item}` : `☐ ${item}`)).join("\n");
 
       await fetch(`https://api.telegram.org/bot${env.TG_BOT_TOKEN}/editMessageText`, {
         method: "POST",
@@ -59,7 +57,11 @@ export default {
       if (text.startsWith("/addlist")) {
         const parts = text.split(" ");
         const date = parts[1];
-        const tasks = parts.slice(2).join(" ").split(";").map((t:any) => t.trim());
+        const tasks = parts
+          .slice(2)
+          .join(" ")
+          .split(";")
+          .map((t: any) => t.trim());
         if (!date || tasks.length === 0) {
           await sendMessage(chatId, "Usage: /addlist YYYY-MM-DD Task1;Task2;Task3", env);
           return new Response("OK");
@@ -94,7 +96,7 @@ export default {
           return new Response("OK");
         }
 
-        const checklist: string[] = JSON.parse(await env.CHECKLIST_KV.get(`checklist:${date}`) ?? "[]");
+        const checklist: string[] = JSON.parse((await env.CHECKLIST_KV.get(`checklist:${date}`)) ?? "[]");
         await sendMessage(chatId, checklist.length > 0 ? checklist.join("\n") : "No checklist for this date", env);
         return new Response("OK");
       }
@@ -121,13 +123,15 @@ export default {
     const defaultList: string[] = JSON.parse((await env.CHECKLIST_KV.get(dayKey)) ?? "[]");
     let checklist: string[] = Array.from(new Set([...defaultList, ...special]));
 
-    if (checklist.length === 0) checklist = ["📝 No checklist configured for today"];
+    if (checklist.length === 0) checklist = [];
 
     // Save checklist for today's ticking
     await env.CHECKLIST_KV.put(`checklist:${dateStr}`, JSON.stringify(checklist));
 
-    // Send checklist to Telegram
-    await sendChecklist(env.TG_CHAT_ID, checklist, env, dateStr);
+    if (checklist.length > 0) {
+      // Send checklist to Telegram
+      await sendChecklist(env.TG_CHAT_ID, checklist, env, dateStr);
+    }
   },
 };
 
@@ -141,9 +145,7 @@ async function sendMessage(chatId: number | string, text: string, env: any) {
 }
 
 async function sendChecklist(chatId: number | string, checklistItems: string[], env: any, dateStr: string) {
-  const buttons = checklistItems.map((item, i) => [
-    { text: `☐ ${item}`, callback_data: `done_${i}_${dateStr}` },
-  ]);
+  const buttons = checklistItems.map((item, i) => [{ text: `☐ ${item}`, callback_data: `done_${i}_${dateStr}` }]);
 
   await fetch(`https://api.telegram.org/bot${env.TG_BOT_TOKEN}/sendMessage`, {
     method: "POST",
